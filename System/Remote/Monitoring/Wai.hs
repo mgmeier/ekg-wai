@@ -61,6 +61,7 @@ import System.Remote.Monitoring.Wai.App
 import Network.Socket (withSocketsDo)
 
 import Control.Concurrent (forkFinally)
+import GHC.Conc (labelThread)
 
 -- $configuration
 --
@@ -229,7 +230,10 @@ forkServerWith :: Metrics.Store -- ^ Metric store
 forkServerWith store host port = do
     Metrics.registerCounter "ekg.server_timestamp_ms" getTimeMs store
     me <- myThreadId
-    tid <- withSocketsDo $ forkFinally (startServer store host port) $ \ r ->
+    tid <- withSocketsDo $ forkFinally (do
+      myThreadId >>= flip labelThread "Wai server (ekg-wai)"
+      startServer store host port
+     ) $ \ r ->
         case r of
             Right _ -> return ()
             Left e  -> case fromException e of
